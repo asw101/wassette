@@ -12,6 +12,8 @@ Please load the fetch component from oci://ghcr.io/yoshuawuyts/fetch:latest
 
 Please provide a concise summary of https://opensource.microsoft.com/blog/2024/09/25/distributing-webassembly-components-using-oci-registries/
 
+Please fetch the content of https://example.com
+
 ## examples/eval-py
 
 Please load the component from oci://ghcr.io/microsoft/eval-py:latest
@@ -26,7 +28,7 @@ Please fetch the content of https://example.com
 
 ## examples/filesystem-rs
 
-Please load the component from oci://ghcr.io/microsoft/filesystem-rs:latest
+Please load the component from oci://ghcr.io/microsoft/filesystem:latest
 
 Please get the content of the file examples/filesystem-rs/README.md
 
@@ -38,7 +40,7 @@ get the weather for latitude 43.65 and longitude -79.38
 
 ## examples/gomodule-go
 
-Please load the component from oci://ghcr.io/microsoft/gomodule-go:latest
+Please load the component from oci://ghcr.io/microsoft/gomodule:latest
 
 get the latest versions for the go module urfave/cli
 
