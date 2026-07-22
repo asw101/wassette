@@ -1,4 +1,4 @@
-name: Rust
+name: Rust Quality and Tests
 
 on:
   push:
@@ -23,10 +23,12 @@ env:
 
 jobs:
   license-headers:
+    name: Check license headers
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
     - name: Verify Rust license headers
       shell: bash
       run: |
@@ -42,34 +44,47 @@ jobs:
         fi
 
   lint:
+    name: Lint Rust
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - run: ./scripts/install-protobuf.sh
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Install Protobuf
+      run: ./scripts/install-protobuf.sh
       shell: bash
-    - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
+    - name: Set up Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
       with:
         components: rustfmt, clippy
-    - run: 
+    - name: Install nightly Rust for formatting
+      run:
         # needed to run rustfmt in nightly toolchain
         rustup toolchain install nightly --component rustfmt
-    - uses: ./.github/actions/rust-cache
-    - name: Run fmt
+    - name: Cache Rust dependencies
+      uses: ./.github/actions/rust-cache
+    - name: Check formatting
       run: cargo +nightly fmt --all -- --check
     - name: Run Clippy
       run: cargo clippy --verbose --workspace
   
   build:
+    name: Build and test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3.0.0
-    - run: ./scripts/install-protobuf.sh
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Set up just
+      uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3.0.0
+    - name: Install Protobuf
+      run: ./scripts/install-protobuf.sh
       shell: bash
-    - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
-    - run: rustup target add wasm32-wasip2
-    - uses: ./.github/actions/rust-cache
+    - name: Set up Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
+    - name: Add wasm32-wasip2 target
+      run: rustup target add wasm32-wasip2
+    - name: Cache Rust dependencies
+      uses: ./.github/actions/rust-cache
     - name: Build
       run: just build
     - name: Run tests
@@ -81,24 +96,30 @@ jobs:
         path: bin/wassette
 
   deps:
-    name: unused dependencies
+    name: Check unused dependencies
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
-    - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Set up Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
     - name: Check unused dependencies
       uses: bnjbvr/cargo-machete@7959c845782fed02ee69303126d4a12d64f1db18 # v0.9.1
 
   security:
-    name: security audit
+    name: Audit dependencies
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
-    - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Set up Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
     - name: Install cargo-audit
       run: cargo install cargo-audit --locked
     - name: Install cargo-deny
@@ -111,20 +132,25 @@ jobs:
       run: cargo deny --config .config/deny.toml check advisories licenses bans sources
 
   coverage:
-    name: test coverage
+    name: Measure test coverage
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - run: ./scripts/install-protobuf.sh
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Install Protobuf
+      run: ./scripts/install-protobuf.sh
       shell: bash
-    - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
+    - name: Set up Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
       with:
         toolchain: nightly
         components: llvm-tools-preview
-    - run: rustup target add wasm32-wasip2
-    - uses: ./.github/actions/rust-cache
+    - name: Add wasm32-wasip2 target
+      run: rustup target add wasm32-wasip2
+    - name: Cache Rust dependencies
+      uses: ./.github/actions/rust-cache
     - name: Install cargo-llvm-cov
       run: cargo install cargo-llvm-cov
     - name: Generate coverage report
@@ -136,7 +162,7 @@ jobs:
       with:
         file: ./lcov.info
         fail_ci_if_error: false
-    - name: Coverage summary
+    - name: Write coverage summary
       uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v7.1.0
       with:
         script: |
@@ -162,25 +188,28 @@ jobs:
           coverage.json
 
   spelling:
-    name: spell check with typos
+    name: Check spelling
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - name: Spell Check Repo
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Check spelling
       uses: crate-ci/typos@80c8a4945eec0f6d464eaf9e65ed98ef085283d1 # v1.38.1
       with:
         config: .config/_typos.toml
   
   linkChecker:
-    name: link checker
+    name: Check links
     permissions:
       contents: read
     if: github.repository == 'microsoft/wassette'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - uses: lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2 # v2.6.1
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Check links
+      uses: lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2 # v2.6.1
       with:
         fail: false # don't fail the build on broken links
         format: markdown

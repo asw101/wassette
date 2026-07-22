@@ -1,4 +1,4 @@
-name: Dependabot Automerge
+name: Auto-merge Dependabot Updates
 
 on:
   pull_request:
@@ -10,11 +10,12 @@ permissions:
 
 jobs:
   dependabot:
+    name: Configure Dependabot auto-merge
     runs-on: ubuntu-latest
     # Only run for dependabot PRs
     if: github.actor == 'dependabot[bot]'
     steps:
-      - name: Dependabot metadata
+      - name: Fetch Dependabot metadata
         id: metadata
         uses: dependabot/fetch-metadata@08eff52bf64351f401fb50d4972fa95b9f2c2d1b # v2.2.0
         with:

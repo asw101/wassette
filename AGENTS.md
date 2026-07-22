@@ -102,7 +102,7 @@ rules even when the agent does not support skills:
 - For tests, internal refactors, formatting, routine dependency maintenance,
   and other changes without user impact, apply the `skip-changelog` label.
 
-The `Changelog Check` workflow enforces this policy. Automated release
+The `Check Changelog` workflow enforces this policy. Automated release
 maintenance PRs are exempt because they are generated after or during the
 release transition.
 

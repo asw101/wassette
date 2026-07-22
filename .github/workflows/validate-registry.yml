@@ -11,16 +11,18 @@ env:
 
 jobs:
   validate:
+    name: Validate component registry
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Check out repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
         fetch-depth: 0  # Fetch all history to compare with main branch
 
-    - name: Setup Node.js
+    - name: Set up Node.js
       uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
       with:
         node-version: '20'
@@ -29,21 +31,22 @@ jobs:
       run: ./scripts/install-protobuf.sh
       shell: bash
 
-    - name: Setup Rust toolchain
+    - name: Set up Rust toolchain
       uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
 
-    - uses: ./.github/actions/rust-cache
+    - name: Cache Rust dependencies
+      uses: ./.github/actions/rust-cache
 
-    - name: Setup Just
+    - name: Set up just
       uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3.0.0
 
-    - name: Build wassette
+    - name: Build Wassette
       run: just build release
 
     - name: Validate component registry
       run: ./scripts/validate-component-registry.sh
 
-    - name: Summary
+    - name: Write validation summary
       if: always()
       run: |
         if [ $? -eq 0 ]; then

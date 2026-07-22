@@ -254,7 +254,7 @@ The [`examples.yml`](.github/workflows/examples.yml) workflow automatically publ
 To manually publish examples with a specific version tag:
 
 1. **Navigate to the Actions tab**:
-   - Go to [Publish Examples workflow](https://github.com/microsoft/wassette/actions/workflows/examples.yml)
+   - Go to the [Build and Publish Examples workflow](https://github.com/microsoft/wassette/actions/workflows/examples.yml)
    - Click "Run workflow"
 
 2. **Configure the workflow run**:

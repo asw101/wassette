@@ -15,13 +15,13 @@ permissions:
 
 jobs:
   update-manifests:
-    name: Update Homebrew and WinGet Manifests
+    name: Update Homebrew and WinGet manifests
     runs-on: ubuntu-latest
     # Skip for prerelease/dry-run releases (e.g., v0.3.4-test1)
     if: "!contains(inputs.tag_name, '-')"
 
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: main
@@ -73,7 +73,7 @@ jobs:
             fi
           done
 
-      - name: Update Homebrew Formula
+      - name: Update Homebrew formula
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
@@ -101,7 +101,7 @@ jobs:
 
           echo "Updated Homebrew Formula successfully"
 
-      - name: Update WinGet Manifest
+      - name: Update WinGet manifest
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           RELEASE_DATE=$(date -u +%Y-%m-%d)
@@ -134,7 +134,7 @@ jobs:
 
           echo "Updated WinGet Manifest successfully"
 
-      - name: Create Pull Request
+      - name: Create pull request
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
         with:
           token: ${{ github.token }}

@@ -9,6 +9,7 @@ name: Copilot Setup Steps
   workflow_dispatch: null
 jobs:
   copilot-setup-steps:
+    name: Set up Copilot environment
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -17,11 +18,11 @@ jobs:
       run: curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash
     - name: Verify gh-aw installation
       run: gh aw version
-    - name: Checkout repository
+    - name: Check out repository
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-    - name: Install protobuf
+    - name: Install Protobuf
       run: ./scripts/install-protobuf.sh
-    - name: Setup Rust toolchain
+    - name: Set up Rust toolchain
       uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c
       with:
         components: rustfmt, clippy
@@ -29,27 +30,27 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt
     - name: Add wasm32-wasip2 target
       run: rustup target add wasm32-wasip2
-    - name: Setup just
+    - name: Set up just
       uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff
-    - name: Setup wasm-tools
+    - name: Set up wasm-tools
       uses: bytecodealliance/actions/wasm-tools/setup@3b93676295fd6f7eaa7af2c2785539e052fa8349
-    - name: Setup uv
+    - name: Set up uv
       uses: astral-sh/setup-uv@3259c6206f993105e3a61b142c2d97bf4b9ef83d
-    - name: Setup Go
+    - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
       with:
         go-version: 1.26.5
-    - name: Setup TinyGo
+    - name: Set up TinyGo
       uses: acifani/setup-tinygo@db56321a62b9a67922bb9ac8f9d085e218807bb3
       with:
         tinygo-version: 0.41.1
     - name: Cache Rust dependencies
       uses: ./.github/actions/rust-cache
-    - name: Install gh-aw extension
+    - name: Ensure gh-aw extension is registered
       run: gh extension install githubnext/gh-aw || true
       env:
         GH_TOKEN: ${{ github.token }}
-    - name: Setup kind cluster
+    - name: Set up kind cluster
       uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde
       with:
         cluster_name: wassette-dev
