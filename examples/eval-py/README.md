@@ -26,7 +26,7 @@ To use this component, load it from the OCI registry and provide a Python expres
 
 **Load the component:**
 ```
-Please load the component from oci://ghcr.io/microsoft/eval-py:latest
+Please load the component from oci://ghcr.io/microsoft/wassette/eval-py:latest
 ```
 
 **Evaluate an expression:**

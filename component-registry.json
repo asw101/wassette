@@ -2,56 +2,56 @@
     {
         "name": "arXiv Research",
         "description": "An arXiv research component for searching and downloading papers written in Rust",
-        "uri": "oci://ghcr.io/microsoft/arxiv-rs:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/arxiv-rs:latest"
     },
     {
         "name": "GitHub API",
         "description": "A comprehensive GitHub REST API component written in JavaScript",
-        "uri": "oci://ghcr.io/microsoft/github-js:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/github-js:latest"
     },
     {
         "name": "Memory Server",
         "description": "A knowledge graph memory storage component written in JavaScript",
-        "uri": "oci://ghcr.io/microsoft/memory-js:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/memory-js:latest"
     },
     {
         "name": "Weather Server",
         "description": "A weather component written in JavaScript",
-        "uri": "oci://ghcr.io/microsoft/get-weather-js:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/get-weather-js:latest"
     },
     {
         "name": "Open-Meteo Weather",
         "description": "A weather component using Open-Meteo API written in JavaScript",
-        "uri": "oci://ghcr.io/microsoft/get-open-meteo-weather-js:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/get-open-meteo-weather-js:latest"
     },
     {
         "name": "Time Server",
         "description": "A time server component written in JavaScript",
-        "uri": "oci://ghcr.io/microsoft/time-server-js:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/time-server-js:latest"
     },
     {
         "name": "Python Eval",
         "description": "A Python expression evaluation component",
-        "uri": "oci://ghcr.io/microsoft/eval-py:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/eval-py:latest"
     },
     {
         "name": "Fetch",
         "description": "A fetch component written in Rust",
-        "uri": "oci://ghcr.io/microsoft/fetch-rs:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/fetch-rs:latest"
     },
     {
         "name": "Filesystem",
         "description": "A filesystem component written in Rust",
-        "uri": "oci://ghcr.io/microsoft/filesystem-rs:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/filesystem-rs:latest"
     },
     {
         "name": "Brave Search",
         "description": "A web search component using Brave Search API written in Rust",
-        "uri": "oci://ghcr.io/microsoft/brave-search-rs:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/brave-search-rs:latest"
     },
     {
         "name": "Go Module Information",
         "description": "A Go module component",
-        "uri": "oci://ghcr.io/microsoft/gomodule-go:latest"
+        "uri": "oci://ghcr.io/microsoft/wassette/gomodule-go:latest"
     }
 ]

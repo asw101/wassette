@@ -42,7 +42,7 @@ With Wassette installed, the next step is to register it with your agent of choi
 Once configured, you can start loading WebAssembly components. To teach your agent to tell the time, ask it to load a time component:
 
 ```text
-Please load the time component from oci://ghcr.io/microsoft/time-server-js:latest
+Please load the time component from oci://ghcr.io/microsoft/wassette/time-server-js:latest
 ```
 
 Now that the time component is loaded, we can ask your agent to tell you the current time:

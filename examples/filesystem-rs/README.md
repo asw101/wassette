@@ -29,7 +29,7 @@ To use this component, load it from the OCI registry and interact with the files
 
 **Load the component:**
 ```
-Please load the component from oci://ghcr.io/microsoft/filesystem-rs:latest
+Please load the component from oci://ghcr.io/microsoft/wassette/filesystem-rs:latest
 ```
 
 **Read operations:**

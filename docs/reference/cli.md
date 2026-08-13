@@ -25,7 +25,7 @@ wassette --help
 wassette component list
 
 # Load a component from an OCI registry
-wassette component load oci://ghcr.io/microsoft/time-server-js:latest
+wassette component load oci://ghcr.io/microsoft/wassette/time-server-js:latest
 
 # Load a component from a local file
 wassette component load file:///path/to/component.wasm
@@ -116,10 +116,10 @@ Load a WebAssembly component from various sources.
 **Load from OCI registry:**
 ```bash
 # Load a component from GitHub Container Registry
-wassette component load oci://ghcr.io/microsoft/time-server-js:latest
+wassette component load oci://ghcr.io/microsoft/wassette/time-server-js:latest
 
 # Load with custom component directory
-wassette component load oci://ghcr.io/microsoft/gomodule:latest --component-dir /custom/components
+wassette component load oci://ghcr.io/microsoft/wassette/gomodule:latest --component-dir /custom/components
 ```
 
 **Load from local file:**
@@ -220,7 +220,7 @@ Inspect a loaded WebAssembly component and display its JSON schema. This command
 **Basic usage:**
 ```bash
 # First, load a component
-wassette component load oci://ghcr.io/microsoft/time-server-js:latest
+wassette component load oci://ghcr.io/microsoft/wassette/time-server-js:latest
 
 # Then inspect it by component ID
 wassette inspect time-server-js
@@ -333,7 +333,7 @@ wassette registry search javascript
     {
       "name": "Weather Server",
       "description": "A weather component written in JavaScript",
-      "uri": "oci://ghcr.io/microsoft/get-weather-js:latest"
+      "uri": "oci://ghcr.io/microsoft/wassette/get-weather-js:latest"
     }
   ]
 }
@@ -358,7 +358,7 @@ wassette registry get "weather server"
 **Get by component URI:**
 ```bash
 # Fetch by full OCI URI
-wassette registry get "oci://ghcr.io/microsoft/time-server-js:latest"
+wassette registry get "oci://ghcr.io/microsoft/wassette/time-server-js:latest"
 ```
 
 **With custom plugin directory:**

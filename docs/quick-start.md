@@ -17,7 +17,7 @@ code --add-mcp '{"name":"Wassette","command":"wassette","args":["run"]}'
 
 Ask your AI agent:
 ```
-Please load the time component from ghcr.io/microsoft/time-server-js:latest
+Please load the time component from ghcr.io/microsoft/wassette/time-server-js:latest
 ```
 
 **3. Use the component**

@@ -22,7 +22,7 @@ Wassette comes with several built-in tools for managing components and their per
 
 ## load-component
 **Parameters:**
-- `path` (string, required): Path to the component from either filesystem or OCI registries (e.g., `oci://ghcr.io/microsoft/time-server-js:latest` or `/path/to/component.wasm`)
+- `path` (string, required): Path to the component from either filesystem or OCI registries (e.g., `oci://ghcr.io/microsoft/wassette/time-server-js:latest` or `/path/to/component.wasm`)
 
 **Returns:**
 ```json
@@ -77,12 +77,12 @@ When an existing component is replaced, the `status` value becomes
     {
       "name": "Weather Server",
       "description": "A weather component written in JavaScript",
-      "uri": "oci://ghcr.io/microsoft/get-weather-js:latest"
+      "uri": "oci://ghcr.io/microsoft/wassette/get-weather-js:latest"
     },
     {
       "name": "Time Server", 
       "description": "A time server component written in JavaScript",
-      "uri": "oci://ghcr.io/microsoft/time-server-js:latest"
+      "uri": "oci://ghcr.io/microsoft/wassette/time-server-js:latest"
     }
   ]
 }

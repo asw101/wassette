@@ -89,7 +89,7 @@ sequenceDiagram
     participant Component as Wasm Component
 
     User->>Agent: "Load time component"
-    Agent->>Wassette: load-component(oci://ghcr.io/microsoft/time-server-js)
+    Agent->>Wassette: load-component(oci://ghcr.io/microsoft/wassette/time-server-js)
     Wassette->>Component: Load and introspect
     Component-->>Wassette: Exports: get-current-time()
     Wassette-->>Agent: Tool registered: get-current-time

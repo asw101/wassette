@@ -1,6 +1,6 @@
 version: 1
 components:
-  - uri: oci://ghcr.io/microsoft/get-weather-js:1.2.3
+  - uri: oci://ghcr.io/microsoft/wassette/get-weather-js:1.2.3
     name: weather-service
     digest: sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
     permissions:
@@ -12,7 +12,7 @@ components:
           - key: OPENWEATHER_API_KEY
             value_from: OPENWEATHER_API_KEY
 
-  - uri: oci://ghcr.io/microsoft/time-server:2.0.1
+  - uri: oci://ghcr.io/microsoft/wassette/time-server:2.0.1
     name: time-service
     digest: sha256:fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321
     permissions:

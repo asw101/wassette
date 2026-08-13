@@ -26,7 +26,7 @@ To use this component, load it from the OCI registry and provide a Go module pat
 
 **Load the component:**
 ```
-Please load the component from oci://ghcr.io/microsoft/gomodule-go:latest
+Please load the component from oci://ghcr.io/microsoft/wassette/gomodule-go:latest
 ```
 
 **Get module information:**

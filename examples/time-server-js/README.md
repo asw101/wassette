@@ -10,7 +10,7 @@ To use this component, load it from the OCI registry and ask for the current tim
 
 **Load the component:**
 ```
-Please load the component from oci://ghcr.io/microsoft/time-server-js:latest
+Please load the component from oci://ghcr.io/microsoft/wassette/time-server-js:latest
 ```
 
 **Get the current time:**

@@ -1,6 +1,6 @@
 version: 1
 components:
-  - uri: oci://ghcr.io/microsoft/get-weather-js:latest
+  - uri: oci://ghcr.io/microsoft/wassette/get-weather-js:latest
     name: weather-service
     permissions:
       network:
@@ -10,14 +10,14 @@ components:
         allow:
           - key: OPENWEATHER_API_KEY
 
-  - uri: oci://ghcr.io/microsoft/time-server:latest
+  - uri: oci://ghcr.io/microsoft/wassette/time-server:latest
     name: time-service
     permissions:
       network:
         allow:
           - host: worldtimeapi.org
 
-  - uri: oci://ghcr.io/microsoft/filesystem-rs:latest
+  - uri: oci://ghcr.io/microsoft/wassette/filesystem-rs:latest
     name: filesystem-service
     permissions:
       storage:

@@ -334,7 +334,7 @@ mod tests {
         let yaml = r#"
 version: 1
 components:
-  - uri: oci://ghcr.io/microsoft/get-weather-js:1.2.3
+  - uri: oci://ghcr.io/microsoft/wassette/get-weather-js:1.2.3
     name: weather-service
     digest: sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
     permissions:
@@ -351,7 +351,7 @@ components:
         assert_eq!(manifest.components.len(), 1);
         assert_eq!(
             manifest.components[0].uri,
-            "oci://ghcr.io/microsoft/get-weather-js:1.2.3"
+            "oci://ghcr.io/microsoft/wassette/get-weather-js:1.2.3"
         );
 
         // Validation should pass

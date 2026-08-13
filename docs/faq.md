@@ -153,7 +153,7 @@ Wassette works with any MCP-compatible AI agent. See the [MCP clients setup guid
 You can load components from OCI registries or local files:
 
 ```text
-Please load the component from oci://ghcr.io/microsoft/time-server-js:latest
+Please load the component from oci://ghcr.io/microsoft/wassette/time-server-js:latest
 ```
 
 Or for local files:

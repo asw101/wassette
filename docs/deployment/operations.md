@@ -35,7 +35,7 @@ TIMESTAMP LEVEL span_info: message field1=value1 field2=value2
 
 **Example - Component Lifecycle (INFO level):**
 ```
-2025-11-02T18:32:10.123Z INFO path="oci://ghcr.io/microsoft/fetch-rs:latest" component_id="fetch_rs" operation="load-component" Component loaded successfully
+2025-11-02T18:32:10.123Z INFO path="oci://ghcr.io/microsoft/wassette/fetch-rs:latest" component_id="fetch_rs" operation="load-component" Component loaded successfully
 2025-11-02T18:35:20.456Z INFO component_id="fetch_rs" operation="unload-component" Component unloaded successfully
 ```
 

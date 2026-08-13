@@ -13,7 +13,7 @@ Load the component from the OCI registry and provide a city name.
 **Load the component:**
 
 ```
-Please load the component from oci://ghcr.io/microsoft/get-weather-js:latest
+Please load the component from oci://ghcr.io/microsoft/wassette/get-weather-js:latest
 ```
 
 **Get the weather:**

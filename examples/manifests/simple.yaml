@@ -1,6 +1,6 @@
 version: 1
 components:
-  - uri: oci://ghcr.io/microsoft/get-weather-js:latest
+  - uri: oci://ghcr.io/microsoft/wassette/get-weather-js:latest
     name: weather-service
     permissions:
       network:

@@ -20,7 +20,7 @@ Load the component from the OCI registry and interact with the knowledge graph:
 
 **Load the component:**
 ```
-Please load the component from oci://ghcr.io/microsoft/memory-js:latest
+Please load the component from oci://ghcr.io/microsoft/wassette/memory-js:latest
 ```
 
 **Create entities:**

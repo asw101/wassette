@@ -27,7 +27,7 @@ To use this component, load it from the OCI registry and provide a URL to fetch.
 **Load the component:**
 
 ```
-Please load the component from oci://ghcr.io/microsoft/fetch-rs:latest
+Please load the component from oci://ghcr.io/microsoft/wassette/fetch-rs:latest
 ```
 
 **Fetch content:**

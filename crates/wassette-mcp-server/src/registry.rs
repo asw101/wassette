@@ -79,7 +79,7 @@ mod tests {
             {
                 "name": "Weather Server",
                 "description": "A weather component",
-                "uri": "oci://ghcr.io/microsoft/get-weather-js:latest"
+                "uri": "oci://ghcr.io/microsoft/wassette/get-weather-js:latest"
             }
         ]"#;
 
@@ -190,7 +190,7 @@ mod tests {
         let components = vec![RegistryComponent {
             name: "Component".to_string(),
             description: "A test component".to_string(),
-            uri: "oci://ghcr.io/microsoft/weather".to_string(),
+            uri: "oci://ghcr.io/microsoft/wassette/weather".to_string(),
         }];
 
         // Should match URI as well
