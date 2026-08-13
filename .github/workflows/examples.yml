@@ -139,42 +139,62 @@ jobs:
         id: publish_versioned
         env:
           FILE: bin/${{ matrix.component.file }}
-          OCI_REFERENCE: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}
+          OCI_REFERENCE: ghcr.io/${{ github.repository_owner }}/wassette/${{ matrix.component.name }}
+          LEGACY_OCI_REFERENCE: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}
           VERSION: ${{ steps.meta.outputs.tag }}
         run: |
           set -euo pipefail
-          output=$(wkg oci push "$OCI_REFERENCE:$VERSION" "$FILE" \
-            --annotation "org.opencontainers.image.description=" \
-            --annotation "org.opencontainers.image.source=" \
-            --annotation "org.opencontainers.image.url=" \
-            --annotation "org.opencontainers.image.version=$VERSION" \
-            --annotation "org.opencontainers.image.licenses=")
+          push() {
+            wkg oci push "$1:$VERSION" "$FILE" \
+              --annotation "org.opencontainers.image.description=" \
+              --annotation "org.opencontainers.image.source=" \
+              --annotation "org.opencontainers.image.url=" \
+              --annotation "org.opencontainers.image.version=$VERSION" \
+              --annotation "org.opencontainers.image.licenses="
+          }
+          output=$(push "$OCI_REFERENCE")
           echo "$output"
           digest=$(echo "$output" | grep -oP 'digest: \K.*')
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          # Transitional: keep the unprefixed reference publishing so existing
+          # oci://ghcr.io/microsoft/<name> URIs keep resolving. Drop this once
+          # consumers have moved to the wassette/ namespace.
+          legacy_output=$(push "$LEGACY_OCI_REFERENCE")
+          echo "$legacy_output"
+          echo "legacy_digest=$(echo "$legacy_output" | grep -oP 'digest: \K.*')" >> "$GITHUB_OUTPUT"
       - name: Sign container image ${{ matrix.component.name }}:${{ steps.meta.outputs.tag }}
         run: |
-          cosign sign --yes ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}@${{ steps.publish_versioned.outputs.digest }}
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/wassette/${{ matrix.component.name }}@${{ steps.publish_versioned.outputs.digest }}
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}@${{ steps.publish_versioned.outputs.legacy_digest }}
 
       - name: Publish ${{ matrix.component.name }} with tag ${{ steps.meta.outputs.release_tag || 'latest' }} (if specified)
         id: publish_latest
         if: steps.meta.outputs.latest == 'true'
         env:
           FILE: bin/${{ matrix.component.file }}
-          OCI_REFERENCE: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}
+          OCI_REFERENCE: ghcr.io/${{ github.repository_owner }}/wassette/${{ matrix.component.name }}
+          LEGACY_OCI_REFERENCE: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}
           VERSION: ${{ steps.meta.outputs.release_tag || 'latest' }}
         run: |
           set -euo pipefail
-          output=$(wkg oci push "$OCI_REFERENCE:$VERSION" "$FILE" \
-            --annotation "org.opencontainers.image.description=" \
-            --annotation "org.opencontainers.image.source=" \
-            --annotation "org.opencontainers.image.url=" \
-            --annotation "org.opencontainers.image.version=$VERSION" \
-            --annotation "org.opencontainers.image.licenses=")
+          push() {
+            wkg oci push "$1:$VERSION" "$FILE" \
+              --annotation "org.opencontainers.image.description=" \
+              --annotation "org.opencontainers.image.source=" \
+              --annotation "org.opencontainers.image.url=" \
+              --annotation "org.opencontainers.image.version=$VERSION" \
+              --annotation "org.opencontainers.image.licenses="
+          }
+          output=$(push "$OCI_REFERENCE")
           echo "$output"
           digest=$(echo "$output" | grep -oP 'digest: \K.*')
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          # Transitional — see the note on the versioned push above.
+          legacy_output=$(push "$LEGACY_OCI_REFERENCE")
+          echo "$legacy_output"
+          echo "legacy_digest=$(echo "$legacy_output" | grep -oP 'digest: \K.*')" >> "$GITHUB_OUTPUT"
       - name: Sign container image ${{ matrix.component.name }}:${{ steps.meta.outputs.release_tag || 'latest' }}
         if: steps.meta.outputs.latest == 'true'
         run: |
-          cosign sign --yes ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}@${{ steps.publish_latest.outputs.digest }}
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/wassette/${{ matrix.component.name }}@${{ steps.publish_latest.outputs.digest }}
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}@${{ steps.publish_latest.outputs.legacy_digest }}

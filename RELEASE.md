@@ -194,7 +194,7 @@ If the automated workflows fail, you can drive the release by hand:
 
 ## Releasing Example Component Images
 
-Example WebAssembly components are automatically published to the GitHub Container Registry (GHCR) as OCI artifacts. This allows users to load examples directly from `oci://ghcr.io/microsoft/<example-name>:latest`.
+Example WebAssembly components are automatically published to the GitHub Container Registry (GHCR) as OCI artifacts. This allows users to load examples directly from `oci://ghcr.io/microsoft/wassette/<example-name>:latest`.
 
 ### Automatic Publishing on Main Branch
 
@@ -219,11 +219,20 @@ The [`examples.yml`](.github/workflows/examples.yml) workflow automatically publ
 
 **What the workflow does:**
 1. Builds all example components using `just build-examples`
-2. Publishes each component to `ghcr.io/microsoft/<component-name>`
-3. Tags each component with both:
+2. Publishes each component to `ghcr.io/microsoft/wassette/<component-name>`
+3. Also publishes it to the legacy, unprefixed `ghcr.io/microsoft/<component-name>`
+   so existing references keep resolving — transitional, see below
+4. Tags each component with both:
    - The commit SHA (e.g., `abc1234`)
    - The `latest` tag for main branch pushes
-4. Signs all published images using Cosign
+5. Signs all published images using Cosign
+
+**Namespace transition:** examples used to publish to
+`ghcr.io/microsoft/<component-name>`, which put them in the same namespace as
+unrelated Microsoft images. They now publish under `ghcr.io/microsoft/wassette/`,
+and the workflow pushes both references for the time being. Once consumers have
+migrated, drop the `LEGACY_OCI_REFERENCE` pushes and their `cosign sign` lines
+from `.github/workflows/examples.yml`.
 
 ### Manual Release of Example Components
 
@@ -249,10 +258,10 @@ Users can load published examples using the Wassette CLI:
 
 ```bash
 # Load the latest version
-wassette component load oci://ghcr.io/microsoft/fetch-rs:latest
+wassette component load oci://ghcr.io/microsoft/wassette/fetch-rs:latest
 
 # Load a specific version
-wassette component load oci://ghcr.io/microsoft/fetch-rs:0.4.0
+wassette component load oci://ghcr.io/microsoft/wassette/fetch-rs:0.4.0
 ```
 
 ### Building Examples Locally
