@@ -94,6 +94,10 @@ When Wassette runs as an HTTP server, it exposes the MCP management plane, inclu
 
 Wassette mitigates this attack through rmcp's `StreamableHttpService`, which rejects HTTP requests whose `Host` header is not a trusted loopback value before MCP processing begins. Streamable HTTP at `/mcp` is now the only supported HTTP transport because the removed SSE transport did not provide this validation. Operators exposing Wassette beyond loopback should place it behind an authenticating reverse proxy.
 
+Serving stateless clients does not change this. MCP protocol revision `2026-07-28` removes the `initialize` handshake and the `Mcp-Session-Id`, so a stateless request has no session for an attacker to steal, replay or fixate, and `--legacy-sessions=false` removes that surface for every client. What it does not remove is the reason the `Host` and `Origin` checks exist: a browser can still be induced to POST to the local server, and a stateless POST is a complete, self-describing request that would be executed on arrival. Those checks are applied to every request, stateless or not, before any MCP processing, and they remain the load-bearing defence against DNS rebinding. They are configured from rmcp's defaults (`localhost`, `127.0.0.1`, `::1`), so a deployment that overrides the allow list is responsible for keeping it as narrow as its real hostnames.
+
+Statelessness is also not a licence to scale horizontally. Component and policy state lives in the server's memory, so identical instances behind a load balancer would disagree about which tools exist and what they may do. See the [operations guide](../deployment/operations.md) for the supported alternatives.
+
 ## Attack Consequences
 
 The threat categories described above are root causes that can lead to various security consequences. Understanding these consequences helps in designing monitoring, incident response, and defense-in-depth strategies.
