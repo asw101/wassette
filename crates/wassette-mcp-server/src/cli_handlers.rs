@@ -90,6 +90,8 @@ pub async fn create_lifecycle_manager(component_dir: Option<PathBuf>) -> Result<
             }),
             environment_vars: std::collections::HashMap::new(),
             bind_address: "127.0.0.1:9001".to_string(),
+            legacy_sessions: true,
+            json_response: false,
         }
     } else {
         config::Config::from_serve(&crate::commands::Serve {
@@ -100,6 +102,8 @@ pub async fn create_lifecycle_manager(component_dir: Option<PathBuf>) -> Result<
             disable_builtin_tools: false,
             bind_address: None,
             manifest: None,
+            legacy_sessions: None,
+            json_response: None,
         })
         .context("Failed to load configuration")?
     };
@@ -110,6 +114,8 @@ pub async fn create_lifecycle_manager(component_dir: Option<PathBuf>) -> Result<
         secrets_dir,
         environment_vars,
         bind_address: _,
+        legacy_sessions: _,
+        json_response: _,
     } = config;
 
     LifecycleManager::builder(component_dir)

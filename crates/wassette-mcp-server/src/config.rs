@@ -45,6 +45,10 @@ fn default_bind_address() -> String {
     format!("{}:{}", host, port)
 }
 
+fn default_legacy_sessions() -> bool {
+    true
+}
+
 /// Configuration for the Wasette MCP server
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -64,6 +68,18 @@ pub struct Config {
     /// Configured via PORT and BIND_HOST environment variables or CLI/config file
     #[serde(default = "default_bind_address", rename = "bind_address")]
     pub bind_address: String,
+
+    /// Whether to keep serving the pre-2026-07-28 session lifecycle.
+    ///
+    /// Defaults to true so pre-2026 clients keep working. Requests negotiating
+    /// 2026-07-28 or later are served statelessly either way.
+    #[serde(default = "default_legacy_sessions")]
+    pub legacy_sessions: bool,
+
+    /// Whether to prefer `application/json` over `text/event-stream` for a
+    /// simple stateless request that produces a single reply.
+    #[serde(default)]
+    pub json_response: bool,
 }
 
 impl Config {
@@ -207,6 +223,8 @@ mod tests {
             disable_builtin_tools: false,
             bind_address: None,
             manifest: None,
+            legacy_sessions: None,
+            json_response: None,
         }
     }
 
@@ -219,6 +237,8 @@ mod tests {
             disable_builtin_tools: false,
             bind_address: None,
             manifest: None,
+            legacy_sessions: None,
+            json_response: None,
         }
     }
 
@@ -412,6 +432,8 @@ bind_address = "0.0.0.0:8080"
             disable_builtin_tools: false,
             bind_address: Some("192.168.1.100:9090".to_string()),
             manifest: None,
+            legacy_sessions: None,
+            json_response: None,
         };
 
         let config =
@@ -464,5 +486,87 @@ bind_address = "0.0.0.0:8080"
                 assert_eq!(config.bind_address, "0.0.0.0:3000");
             },
         );
+    }
+
+    #[test]
+    fn test_transport_settings_default_to_todays_behaviour() {
+        let temp_dir = TempDir::new().unwrap();
+        let non_existent_config = temp_dir.path().join("non_existent_config.toml");
+
+        let config = Config::new_from_path(&empty_test_cli_config(), &non_existent_config)
+            .expect("Failed to create config");
+
+        // Legacy clients keep their session lifecycle unless an operator opts out.
+        assert!(config.legacy_sessions);
+        assert!(!config.json_response);
+    }
+
+    #[test]
+    fn test_transport_settings_from_config_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_file = temp_dir.path().join("config.toml");
+
+        let toml_content = r#"
+legacy_sessions = false
+json_response = true
+"#;
+        fs::write(&config_file, toml_content).unwrap();
+
+        let config = Config::new_from_path(&empty_test_cli_config(), &config_file)
+            .expect("Failed to create config");
+
+        assert!(!config.legacy_sessions);
+        assert!(config.json_response);
+    }
+
+    #[test]
+    fn test_transport_settings_from_env_vars() {
+        temp_env::with_vars(
+            vec![
+                ("WASSETTE_LEGACY_SESSIONS", Some("false")),
+                ("WASSETTE_JSON_RESPONSE", Some("true")),
+            ],
+            || {
+                let temp_dir = TempDir::new().unwrap();
+                let non_existent_config = temp_dir.path().join("non_existent_config.toml");
+
+                let config = Config::new_from_path(&empty_test_cli_config(), &non_existent_config)
+                    .expect("Failed to create config");
+
+                assert!(!config.legacy_sessions);
+                assert!(config.json_response);
+            },
+        );
+    }
+
+    #[test]
+    fn test_transport_settings_cli_override() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_file = temp_dir.path().join("config.toml");
+
+        let toml_content = r#"
+legacy_sessions = false
+json_response = true
+"#;
+        fs::write(&config_file, toml_content).unwrap();
+
+        let serve_config = Serve {
+            component_dir: None,
+            transport: Default::default(),
+            env_vars: vec![],
+            env_file: None,
+            disable_builtin_tools: false,
+            bind_address: None,
+            manifest: None,
+            legacy_sessions: Some(true),
+            json_response: Some(false),
+        };
+
+        let config =
+            Config::new_from_path(&serve_config, &config_file).expect("Failed to create config");
+
+        // CLI values should take precedence over the config file
+        assert!(config.legacy_sessions);
+        assert!(!config.json_response);
     }
 }
