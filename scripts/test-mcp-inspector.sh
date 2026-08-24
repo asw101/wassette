@@ -7,34 +7,54 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSPECTOR_PACKAGE="${INSPECTOR_PACKAGE:-@modelcontextprotocol/inspector@2.2.0}"
 INSPECTOR_BIN="${INSPECTOR_BIN:-$REPO_ROOT/tests/mcp-inspector/node_modules/.bin/mcp-inspector}"
-INSPECTOR_CONFIG="${INSPECTOR_CONFIG:-$REPO_ROOT/.config/mcp-inspector.json}"
+INSPECTOR_CONFIG_SOURCE="${INSPECTOR_CONFIG:-$REPO_ROOT/.config/mcp-inspector.json}"
 WASSETTE_BIN="${WASSETTE_BIN:-$REPO_ROOT/bin/wassette}"
-READY_URL="${READY_URL:-http://127.0.0.1:9001/ready}"
-FIXTURE_URL="${FIXTURE_URL:-http://127.0.0.1:9002/fixture.txt}"
+WASSETTE_PORT="${WASSETTE_PORT:-}"
+FIXTURE_PORT="${FIXTURE_PORT:-}"
 
 FETCH_COMPONENT="${FETCH_COMPONENT:-$REPO_ROOT/examples/fetch-rs/target/wasm32-wasip2/release/fetch_rs.wasm}"
 FILESYSTEM_COMPONENT="${FILESYSTEM_COMPONENT:-$REPO_ROOT/examples/filesystem-rs/target/wasm32-wasip2/release/filesystem.wasm}"
 TIME_COMPONENT="${TIME_COMPONENT:-$REPO_ROOT/examples/time-server-js/time.wasm}"
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/wassette-inspector.XXXXXX")"
+INSPECTOR_CONFIG="$TMP_DIR/mcp-inspector.json"
 WASSETTE_PID=""
 HTTP_PID=""
 
+stop_process() {
+    local pid=$1
+
+    if [[ -z "$pid" ]]; then
+        return
+    fi
+
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -TERM "$pid" 2>/dev/null || true
+        for _ in $(seq 1 50); do
+            if ! kill -0 "$pid" 2>/dev/null; then
+                break
+            fi
+            sleep 0.1
+        done
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    fi
+    wait "$pid" 2>/dev/null || true
+}
+
 cleanup() {
     local exit_code=$?
+    trap - EXIT INT TERM
 
-    if [[ -n "$HTTP_PID" ]] && kill -0 "$HTTP_PID" 2>/dev/null; then
-        kill "$HTTP_PID"
-        wait "$HTTP_PID" 2>/dev/null || true
-    fi
-    if [[ -n "$WASSETTE_PID" ]] && kill -0 "$WASSETTE_PID" 2>/dev/null; then
-        kill "$WASSETTE_PID"
-        wait "$WASSETTE_PID" 2>/dev/null || true
-    fi
+    stop_process "$WASSETTE_PID"
+    stop_process "$HTTP_PID"
     rm -rf "$TMP_DIR"
     exit "$exit_code"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -55,62 +75,124 @@ if (major < 22 || (major === 22 && minor < 19)) {
 }
 '
 
-for path in "$INSPECTOR_CONFIG" "$WASSETTE_BIN" "$FETCH_COMPONENT" "$FILESYSTEM_COMPONENT" "$TIME_COMPONENT"; do
+for path in "$INSPECTOR_CONFIG_SOURCE" "$WASSETTE_BIN" "$FETCH_COMPONENT" "$FILESYSTEM_COMPONENT" "$TIME_COMPONENT"; do
     if [[ ! -e "$path" ]]; then
         echo "error: required test artifact does not exist: $path" >&2
         exit 1
     fi
 done
 
+path_to_file_uri() {
+    python3 - "$1" <<'PY'
+import pathlib
+import sys
+
+print(pathlib.Path(sys.argv[1]).resolve().as_uri())
+PY
+}
+
+FETCH_COMPONENT_URI="$(path_to_file_uri "$FETCH_COMPONENT")"
+FILESYSTEM_COMPONENT_URI="$(path_to_file_uri "$FILESYSTEM_COMPONENT")"
+TIME_COMPONENT_URI="$(path_to_file_uri "$TIME_COMPONENT")"
+
+read -r WASSETTE_PORT FIXTURE_PORT < <(
+    python3 - "$WASSETTE_PORT" "$FIXTURE_PORT" <<'PY'
+import socket
+import sys
+
+sockets = []
+ports = []
+try:
+    for value in sys.argv[1:]:
+        port = int(value) if value else 0
+        if not 0 <= port <= 65535:
+            raise ValueError(f"invalid TCP port: {port}")
+        sock = socket.socket()
+        sock.bind(("127.0.0.1", port))
+        sockets.append(sock)
+        ports.append(sock.getsockname()[1])
+except (OSError, ValueError) as error:
+    print(f"error: cannot reserve MCP Inspector test ports: {error}", file=sys.stderr)
+    sys.exit(1)
+finally:
+    for sock in sockets:
+        sock.close()
+
+print(*ports)
+PY
+)
+
+MCP_URL="http://127.0.0.1:$WASSETTE_PORT/mcp"
+READY_URL="http://127.0.0.1:$WASSETTE_PORT/ready"
+FIXTURE_URL="http://127.0.0.1:$FIXTURE_PORT/fixture.txt"
+
 mkdir -p "$TMP_DIR/components" "$TMP_DIR/http" "$TMP_DIR/fs"
 printf 'served by the Wassette Inspector fixture\n' > "$TMP_DIR/http/fixture.txt"
 printf 'read through a real filesystem component\n' > "$TMP_DIR/fs/component.txt"
+jq --arg url "$MCP_URL" '
+    (.mcpServers[] | select(.type == "http") | .url) = $url
+' "$INSPECTOR_CONFIG_SOURCE" > "$INSPECTOR_CONFIG"
 
-python3 -m http.server 9002 --bind 127.0.0.1 --directory "$TMP_DIR/http" \
+wait_for_url() {
+    local pid=$1
+    local url=$2
+    local label=$3
+    local log=$4
+
+    for _ in $(seq 1 100); do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            echo "error: $label exited before becoming ready" >&2
+            cat "$log" >&2
+            return 1
+        fi
+        if curl --fail --silent "$url" >/dev/null; then
+            return
+        fi
+        sleep 0.1
+    done
+
+    echo "error: $label did not become ready" >&2
+    cat "$log" >&2
+    return 1
+}
+
+python3 -m http.server "$FIXTURE_PORT" --bind 127.0.0.1 --directory "$TMP_DIR/http" \
     >"$TMP_DIR/http.log" 2>&1 &
 HTTP_PID=$!
+wait_for_url "$HTTP_PID" "$FIXTURE_URL" "HTTP fixture" "$TMP_DIR/http.log"
 
 RUST_LOG=warn "$WASSETTE_BIN" serve \
     --streamable-http \
-    --bind-address 127.0.0.1:9001 \
+    --bind-address "127.0.0.1:$WASSETTE_PORT" \
     --component-dir "$TMP_DIR/components" \
     >"$TMP_DIR/wassette.log" 2>&1 &
 WASSETTE_PID=$!
-
-for _ in $(seq 1 100); do
-    if curl --fail --silent "$READY_URL" >/dev/null; then
-        break
-    fi
-    if ! kill -0 "$WASSETTE_PID" 2>/dev/null; then
-        echo "error: Wassette exited before becoming ready" >&2
-        cat "$TMP_DIR/wassette.log" >&2
-        exit 1
-    fi
-    sleep 0.1
-done
-
-if ! curl --fail --silent "$READY_URL" >/dev/null; then
-    echo "error: Wassette did not become ready" >&2
-    cat "$TMP_DIR/wassette.log" >&2
-    exit 1
-fi
+wait_for_url "$WASSETTE_PID" "$READY_URL" "Wassette" "$TMP_DIR/wassette.log"
 
 inspector() {
     local server=$1
+    local output
     shift
     if [[ -x "$INSPECTOR_BIN" ]]; then
-        "$INSPECTOR_BIN" --cli \
+        if ! output="$("$INSPECTOR_BIN" --cli \
             --config "$INSPECTOR_CONFIG" \
             --server "$server" \
             "$@" \
-            --format json
+            --format json)"; then
+            printf '%s\n' "$output" >&2
+            return 1
+        fi
     else
-        npx --yes "$INSPECTOR_PACKAGE" --cli \
+        if ! output="$(npx --yes "$INSPECTOR_PACKAGE" --cli \
             --config "$INSPECTOR_CONFIG" \
             --server "$server" \
             "$@" \
-            --format json
+            --format json)"; then
+            printf '%s\n' "$output" >&2
+            return 1
+        fi
     fi
+    printf '%s\n' "$output"
 }
 
 call_tool() {
@@ -134,52 +216,75 @@ assert_tool_call_succeeded() {
 echo "Checking MCP 2 discovery and legacy initialization"
 modern_info="$(inspector wassette-modern --method initialize)"
 legacy_info="$(inspector wassette-legacy --method initialize)"
-jq -e '.result.protocolVersion == "2026-07-28"' <<<"$modern_info" >/dev/null
 jq -e '
-    .result.protocolVersion != "2026-07-28"
+    .result.protocolVersion == "2026-07-28"
+    and .result.capabilities.tools.listChanged == true
+    and (.result.capabilities | has("prompts") | not)
+    and (.result.capabilities | has("resources") | not)
+' <<<"$modern_info" >/dev/null
+jq -e '
+    .result.protocolVersion == "2025-11-25"
+    and .result.capabilities.tools.listChanged == true
     and (.result.serverInfo.name | type == "string" and length > 0)
 ' \
     <<<"$legacy_info" >/dev/null
 
-echo "Checking one-shot MCP surfaces in both protocol eras"
+echo "Checking tool discovery and initial state in both protocol eras"
 for server in wassette-modern wassette-legacy; do
-    inspector "$server" --method tools/list \
-        | jq -e '.result.tools | any(.name == "load-component")' >/dev/null
-    inspector "$server" --method resources/list \
-        | jq -e '.result.resources | type == "array"' >/dev/null
-    inspector "$server" --method resources/templates/list \
-        | jq -e '.result.resourceTemplates | type == "array"' >/dev/null
-    inspector "$server" --method prompts/list \
-        | jq -e '.result.prompts | type == "array"' >/dev/null
-    call_tool "$server" list-components '{}' | assert_tool_call_succeeded
+    tools="$(inspector "$server" --method tools/list)"
+    jq -e '.result.tools | any(.name == "load-component")' <<<"$tools" >/dev/null
+
+    components="$(call_tool "$server" list-components '{}')"
+    assert_tool_call_succeeded <<<"$components"
+    jq -e '
+        .result.content[0].text
+        | fromjson
+        | .components
+        | type == "array" and length == 0
+    ' <<<"$components" >/dev/null
 done
 
 echo "Loading representative Rust and JavaScript components through MCP 2"
-fetch_load="$(call_tool wassette-modern load-component "$(jq -cn --arg path "$FETCH_COMPONENT" '{path: $path}')")"
-filesystem_load="$(call_tool wassette-modern load-component "$(jq -cn --arg path "$FILESYSTEM_COMPONENT" '{path: $path}')")"
-time_load="$(call_tool wassette-modern load-component "$(jq -cn --arg path "$TIME_COMPONENT" '{path: $path}')")"
+fetch_load="$(call_tool wassette-modern load-component "$(jq -cn --arg path "$FETCH_COMPONENT_URI" '{path: $path}')")"
+filesystem_load="$(call_tool wassette-modern load-component "$(jq -cn --arg path "$FILESYSTEM_COMPONENT_URI" '{path: $path}')")"
+time_load="$(call_tool wassette-modern load-component "$(jq -cn --arg path "$TIME_COMPONENT_URI" '{path: $path}')")"
+assert_tool_call_succeeded <<<"$fetch_load"
+assert_tool_call_succeeded <<<"$filesystem_load"
+assert_tool_call_succeeded <<<"$time_load"
 
 fetch_id="$(jq -r '.result.content[0].text | fromjson | .id' <<<"$fetch_load")"
 filesystem_id="$(jq -r '.result.content[0].text | fromjson | .id' <<<"$filesystem_load")"
 time_id="$(jq -r '.result.content[0].text | fromjson | .id' <<<"$time_load")"
+time_tool="$(jq -r '.result.content[0].text | fromjson | .tools[0]' <<<"$time_load")"
 
 [[ "$fetch_id" == "fetch_rs" ]]
 [[ "$filesystem_id" == "filesystem" ]]
 [[ -n "$time_id" && "$time_id" != "null" ]]
+[[ -n "$time_tool" && "$time_tool" != "null" ]]
 
 for server in wassette-modern wassette-legacy; do
     tools="$(inspector "$server" --method tools/list)"
-    jq -e '
+    jq -e --arg time_tool "$time_tool" '
         .result.tools
         | (any(.name == "fetch"))
           and (any(.name == "read-file"))
-          and (any(.name == "get-current-time"))
+          and (any(.name == $time_tool))
     ' <<<"$tools" >/dev/null
 done
 
 echo "Calling the JavaScript component through both protocol eras"
-call_tool wassette-modern get-current-time '{}' | assert_tool_call_succeeded
-call_tool wassette-legacy get-current-time '{}' | assert_tool_call_succeeded
+for server in wassette-modern wassette-legacy; do
+    time_result="$(call_tool "$server" "$time_tool" '{}')"
+    assert_tool_call_succeeded <<<"$time_result"
+    jq -e '
+        .result.content
+        | any(
+            .text?
+            | strings
+            | test("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.*Z")
+        )
+    ' <<<"$time_result" >/dev/null
+done
 
 echo "Granting and exercising filesystem access through MCP 2"
 storage_args="$(jq -cn \
@@ -207,12 +312,17 @@ jq -e '.result.content[0].text | contains("served by the Wassette Inspector fixt
 echo "Confirming shared server state from both client eras"
 for server in wassette-modern wassette-legacy; do
     components="$(call_tool "$server" list-components '{}')"
-    jq -e '
+    assert_tool_call_succeeded <<<"$components"
+    jq -e \
+        --arg fetch_id "$fetch_id" \
+        --arg filesystem_id "$filesystem_id" \
+        --arg time_id "$time_id" '
         .result.content[0].text
         | fromjson
         | .components
-        | (any(.id == "fetch_rs"))
-          and (any(.id == "filesystem"))
+        | (any(.id == $fetch_id))
+          and (any(.id == $filesystem_id))
+          and (any(.id == $time_id))
           and (length == 3)
     ' <<<"$components" >/dev/null
 done

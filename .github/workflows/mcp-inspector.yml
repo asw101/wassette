@@ -41,6 +41,7 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740e6277c0a99b617c7a31fe5020 # v7.0.0
@@ -60,8 +61,7 @@ jobs:
       - name: Build Wassette and representative components
         run: |
           just build
-          just build-test-components
-          (cd examples/time-server-js && npm ci && npm run build)
+          just build-mcp-inspector-components
       - name: Test Inspector CLI in both protocol eras
         env:
           INSPECTOR_BIN: ./tests/mcp-inspector/node_modules/.bin/mcp-inspector
