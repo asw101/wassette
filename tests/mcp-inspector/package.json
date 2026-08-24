@@ -6,7 +6,6 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/inspector": "2.2.0",
-    "playwright": "1.58.2"
+    "@modelcontextprotocol/inspector": "2.2.0"
   }
 }

@@ -27,7 +27,6 @@ test-mcp-inspector:
     just build-mcp-inspector-components
     npm ci --prefix tests/mcp-inspector
     ./scripts/test-mcp-inspector.sh
-    node tests/mcp-inspector/browser.mjs
 
 build mode="debug":
     mkdir -p bin

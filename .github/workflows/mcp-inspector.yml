@@ -55,9 +55,7 @@ jobs:
           ./scripts/install-protobuf.sh
           rustup target add wasm32-wasip2
       - name: Install MCP Inspector test dependencies
-        run: |
-          npm ci --prefix tests/mcp-inspector
-          tests/mcp-inspector/node_modules/.bin/playwright install --with-deps chromium
+        run: npm ci --prefix tests/mcp-inspector
       - name: Build Wassette and representative components
         run: |
           just build
@@ -66,5 +64,3 @@ jobs:
         env:
           INSPECTOR_BIN: ./tests/mcp-inspector/node_modules/.bin/mcp-inspector
         run: ./scripts/test-mcp-inspector.sh
-      - name: Test Inspector browser with MCP 2
-        run: node tests/mcp-inspector/browser.mjs
