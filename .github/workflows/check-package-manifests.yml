@@ -1,0 +1,214 @@
+name: Check Package Manifests
+
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Formula/**'
+      - 'winget/**'
+      - '.github/workflows/check-package-manifests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check-manifests:
+    name: Check Homebrew and WinGet Manifests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check package manifests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          REPO="${{ github.repository }}"
+          FORMULA="Formula/wassette.rb"
+          WINGET="winget/Microsoft.Wassette.yaml"
+          FAILURES=0
+          SUMMARY_FILES=()
+          SUMMARY_EXPECTED=()
+          SUMMARY_FOUND=()
+
+          add_summary() {
+            SUMMARY_FILES+=("$1")
+            SUMMARY_EXPECTED+=("$2")
+            SUMMARY_FOUND+=("$3")
+          }
+
+          write_summary() {
+            local status=$?
+            {
+              if (( status == 0 )); then
+                echo "## Package manifests are current"
+              else
+                echo "## Package manifest check failed"
+              fi
+              echo
+              echo "| File | Expected | Found |"
+              echo "| --- | --- | --- |"
+              for index in "${!SUMMARY_FILES[@]}"; do
+                printf '| `%s` | `%s` | `%s` |\n' \
+                  "${SUMMARY_FILES[$index]}" \
+                  "${SUMMARY_EXPECTED[$index]}" \
+                  "${SUMMARY_FOUND[$index]}"
+              done
+            } >> "$GITHUB_STEP_SUMMARY"
+            return "$status"
+          }
+          trap write_summary EXIT
+
+          fail_check() {
+            local file=$1
+            local message=$2
+            FAILURES=$((FAILURES + 1))
+            echo "::error file=$file::$message"
+          }
+
+          check_checksum() {
+            local file=$1
+            local field=$2
+            local recorded=$3
+            local asset_name=$4
+            local asset_json
+            local digest
+            local expected
+
+            asset_json=$(jq -c --arg name "$asset_name" \
+              '.assets | map(select(.name == $name)) | first // empty' \
+              <<< "$LATEST_RELEASE")
+
+            if [[ -z "$asset_json" ]]; then
+              add_summary "$file ($field)" "Release asset $asset_name" "${recorded:-missing}"
+              fail_check "$file" "Release $LATEST_TAG does not contain asset $asset_name."
+              return 0
+            fi
+
+            digest=$(jq -r '.digest // empty' <<< "$asset_json")
+            if [[ -z "$digest" ]]; then
+              echo "::notice file=$file::No digest is available for $asset_name; skipping this checksum comparison."
+              add_summary "$file ($field)" "API digest unavailable; skipped" "${recorded:-missing}"
+              return 0
+            fi
+
+            if [[ "$digest" != sha256:* ]]; then
+              add_summary "$file ($field)" "sha256 digest for $asset_name" "$digest"
+              fail_check "$file" "Release asset $asset_name has an unsupported digest value: $digest"
+              return 0
+            fi
+
+            expected="${digest#sha256:}"
+            expected="${expected,,}"
+            recorded="${recorded,,}"
+            add_summary "$file ($field)" "$expected" "${recorded:-missing}"
+            if [[ "$recorded" != "$expected" ]]; then
+              fail_check "$file" "$field is stale for $asset_name: expected $expected, found ${recorded:-missing}."
+            fi
+          }
+
+          RELEASES=$(gh api --paginate --slurp \
+            "repos/$REPO/releases?per_page=100")
+          LATEST_RELEASE=$(jq -c '
+            flatten
+            | map(select(
+                (.draft == false)
+                and (.prerelease == false)
+                and ((.tag_name | ltrimstr("v") | contains("-")) | not)
+              ))
+            | first
+          ' <<< "$RELEASES")
+
+          if [[ -z "$LATEST_RELEASE" || "$LATEST_RELEASE" == "null" ]]; then
+            add_summary "GitHub release" "Stable release tag without a hyphen" "missing"
+            echo "::error::No non-draft, non-prerelease release without a hyphen was found."
+            exit 1
+          fi
+
+          LATEST_TAG=$(jq -r '.tag_name' <<< "$LATEST_RELEASE")
+          LATEST_VERSION="${LATEST_TAG#v}"
+
+          FORMULA_VERSION=$(sed -nE \
+            's/^[[:space:]]*version "([^"]+)".*$/\1/p' "$FORMULA" \
+            | paste -sd ',' -)
+          FORMULA_VERSION="${FORMULA_VERSION:-missing}"
+          add_summary "$FORMULA (version)" "$LATEST_VERSION" "$FORMULA_VERSION"
+          if [[ "$FORMULA_VERSION" != "$LATEST_VERSION" ]]; then
+            fail_check "$FORMULA" \
+              "$FORMULA is stale: latest release version is $LATEST_VERSION, found $FORMULA_VERSION."
+          fi
+
+          WINGET_VERSION=$(sed -nE \
+            's/^PackageVersion:[[:space:]]*(.*)$/\1/p' "$WINGET" \
+            | paste -sd ',' -)
+          WINGET_VERSION="${WINGET_VERSION:-missing}"
+          add_summary "$WINGET (PackageVersion)" "$LATEST_VERSION" "$WINGET_VERSION"
+          if [[ "$WINGET_VERSION" != "$LATEST_VERSION" ]]; then
+            fail_check "$WINGET" \
+              "$WINGET is stale: latest release version is $LATEST_VERSION, found $WINGET_VERSION."
+          fi
+
+          for PLATFORM in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
+            ASSET_NAME="wassette_${LATEST_VERSION}_${PLATFORM}.tar.gz"
+            FORMULA_SHA=$(awk -v suffix="_${PLATFORM}.tar.gz" '
+              index($0, suffix) {
+                getline
+                if ($1 == "sha256") {
+                  gsub(/"/, "", $2)
+                  print $2
+                  exit
+                }
+              }
+            ' "$FORMULA")
+            check_checksum "$FORMULA" "$PLATFORM sha256" "$FORMULA_SHA" "$ASSET_NAME"
+          done
+
+          for ARCH in x64 arm64; do
+            if [[ "$ARCH" == "x64" ]]; then
+              PLATFORM="windows_amd64"
+            else
+              PLATFORM="windows_arm64"
+            fi
+
+            ASSET_NAME="wassette_${LATEST_VERSION}_${PLATFORM}.zip"
+            EXPECTED_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/$ASSET_NAME"
+            INSTALLER_URL=$(awk -v arch="$ARCH" '
+              $2 == "Architecture:" && $3 == arch {
+                installer = 1
+                next
+              }
+              installer && $1 == "InstallerUrl:" {
+                print $2
+                exit
+              }
+            ' "$WINGET")
+            add_summary "$WINGET ($ARCH InstallerUrl)" "$EXPECTED_URL" "${INSTALLER_URL:-missing}"
+            if [[ "$INSTALLER_URL" != "$EXPECTED_URL" ]]; then
+              fail_check "$WINGET" \
+                "$ARCH InstallerUrl does not point at release version $LATEST_VERSION: expected $EXPECTED_URL, found ${INSTALLER_URL:-missing}."
+            fi
+
+            INSTALLER_SHA=$(awk -v arch="$ARCH" '
+              $2 == "Architecture:" && $3 == arch {
+                installer = 1
+                next
+              }
+              installer && $1 == "InstallerSha256:" {
+                print $2
+                exit
+              }
+            ' "$WINGET")
+            check_checksum "$WINGET" "$ARCH InstallerSha256" "$INSTALLER_SHA" "$ASSET_NAME"
+          done
+
+          if (( FAILURES > 0 )); then
+            echo "::error::$FAILURES package manifest check(s) failed for $LATEST_TAG."
+            exit 1
+          fi
+
+          echo "Package manifests match $LATEST_TAG."
