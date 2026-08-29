@@ -151,6 +151,24 @@ pub struct ComponentLoadOutcome {
     pub tool_names: Vec<String>,
 }
 
+/// Warn when a component loads successfully but contributes no callable tools.
+///
+/// A load that registers nothing is reported identically to a useful one, so a
+/// component whose exports failed to survive its build can sit in the registry
+/// unnoticed. Some components are legitimately toolless (middleware that exports an
+/// interface rather than callable functions), so this names the component and lets
+/// the load succeed instead of failing it.
+fn warn_if_component_exports_no_tools(component_id: &str, tool_names: &[String]) {
+    if tool_names.is_empty() {
+        warn!(
+            %component_id,
+            "Component exported no tools: it loaded successfully but contributes nothing \
+             callable. This is expected for a component that exports an interface rather than \
+             functions; otherwise the component was likely built without its exports"
+        );
+    }
+}
+
 impl ComponentRegistry {
     fn new() -> Self {
         Self::default()
@@ -551,6 +569,8 @@ impl LifecycleManager {
         if let Err(error) = self.policy_manager.restore_from_disk(component_id).await {
             warn!(%component_id, error = %format_error_chain(&error), "Failed to restore policy attachment");
         }
+
+        warn_if_component_exports_no_tools(component_id, &tool_names);
 
         Ok(ComponentLoadOutcome {
             component_id: component_id.to_string(),
@@ -2228,5 +2248,95 @@ permissions:
             captured.contains("existing_components=get-weather-js"),
             "{captured}"
         );
+    }
+
+    #[test]
+    fn test_warn_if_component_exports_no_tools_names_only_the_toolless_component() {
+        let logs = CapturedLogs::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::WARN)
+            .with_writer(logs.clone())
+            .finish();
+
+        tracing::subscriber::with_default(subscriber, || {
+            warn_if_component_exports_no_tools("fetch-rs", &["fetch".to_string()]);
+            assert!(!logs.contents().contains("Component exported no tools"));
+
+            warn_if_component_exports_no_tools("arxiv-rs", &[]);
+        });
+
+        let captured = logs.contents();
+        assert!(
+            captured.contains("Component exported no tools"),
+            "{captured}"
+        );
+        assert!(captured.contains("component_id=arxiv-rs"), "{captured}");
+    }
+
+    /// A minimal but valid WebAssembly component that exports nothing.
+    ///
+    /// Preamble only: the `\0asm` magic, component version `0x000d`, and layer `0x0001`.
+    const EMPTY_COMPONENT: &[u8] = &[0x00, 0x61, 0x73, 0x6d, 0x0d, 0x00, 0x01, 0x00];
+
+    #[test(tokio::test)]
+    async fn test_loading_a_component_with_no_exports_warns() -> Result<()> {
+        use tracing::instrument::WithSubscriber;
+
+        let manager = create_test_manager().await?;
+        let temp_dir = tempfile::tempdir()?;
+        let component_path = temp_dir.path().join("toolless.wasm");
+        tokio::fs::write(&component_path, EMPTY_COMPONENT).await?;
+
+        let logs = CapturedLogs::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::WARN)
+            .with_writer(logs.clone())
+            .finish();
+
+        let outcome = manager
+            .load_component(&format!("file://{}", component_path.display()))
+            .with_subscriber(subscriber)
+            .await?;
+
+        assert!(outcome.tool_names.is_empty());
+        let captured = logs.contents();
+        assert!(
+            captured.contains("Component exported no tools"),
+            "{captured}"
+        );
+        assert!(captured.contains("component_id=toolless"), "{captured}");
+
+        Ok(())
+    }
+
+    #[test(tokio::test)]
+    async fn test_loading_a_component_with_exports_does_not_warn() -> Result<()> {
+        use tracing::instrument::WithSubscriber;
+
+        let manager = create_test_manager().await?;
+        let component_path = build_example_component().await?;
+
+        let logs = CapturedLogs::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::WARN)
+            .with_writer(logs.clone())
+            .finish();
+
+        let outcome = manager
+            .load_component(&format!("file://{}", component_path.display()))
+            .with_subscriber(subscriber)
+            .await?;
+
+        assert!(!outcome.tool_names.is_empty());
+        let captured = logs.contents();
+        assert!(
+            !captured.contains("Component exported no tools"),
+            "{captured}"
+        );
+
+        Ok(())
     }
 }

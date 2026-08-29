@@ -16,8 +16,12 @@ use crate::permission_synthesis;
 /// partial provisioning run is fatal to the caller.
 #[derive(Debug, Default)]
 pub struct ProvisioningReport {
-    /// Names (or URIs) of the components that provisioned successfully.
-    pub provisioned: Vec<String>,
+    /// Name (or URI) and exported tool count for each component that provisioned
+    /// successfully.
+    ///
+    /// The tool count is carried because a component that provisions with zero tools
+    /// contributes nothing, and a count of components alone cannot show that.
+    pub provisioned: Vec<(String, usize)>,
     /// Name (or URI) and error for each component that failed to provision.
     pub failures: Vec<(String, anyhow::Error)>,
 }
@@ -39,6 +43,34 @@ impl ProvisioningReport {
             .iter()
             .map(|(name, _)| name.as_str())
             .collect()
+    }
+
+    /// Total number of tools contributed by the components that provisioned.
+    pub fn tool_count(&self) -> usize {
+        self.provisioned.iter().map(|(_, tools)| tools).sum()
+    }
+
+    /// Render the components that provisioned, each with the number of tools it
+    /// exported.
+    ///
+    /// Returns `None` when nothing provisioned.
+    pub fn provisioned_summary(&self) -> Option<String> {
+        if self.provisioned.is_empty() {
+            return None;
+        }
+
+        Some(
+            self.provisioned
+                .iter()
+                .map(|(name, tools)| {
+                    format!(
+                        "{name} ({tools} tool{})",
+                        if *tools == 1 { "" } else { "s" }
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", "),
+        )
     }
 
     /// Render the multi-line summary of every provisioning failure.
@@ -112,7 +144,9 @@ impl<'a> ProvisioningController<'a> {
             );
 
             match self.provision_component(component).await {
-                Ok(()) => report.provisioned.push(component_name.to_string()),
+                Ok(tool_count) => report
+                    .provisioned
+                    .push((component_name.to_string(), tool_count)),
                 Err(e) => {
                     tracing::error!(
                         "Failed to provision component {}: {}",
@@ -125,14 +159,21 @@ impl<'a> ProvisioningController<'a> {
         }
 
         if !report.has_failures() {
-            tracing::info!("Successfully provisioned all components");
+            match report.provisioned_summary() {
+                Some(summary) => tracing::info!(
+                    "Successfully provisioned all components with {} tool(s) total: {}",
+                    report.tool_count(),
+                    summary
+                ),
+                None => tracing::info!("Successfully provisioned all components"),
+            }
         }
 
         report
     }
 
-    /// Provision a single component
-    async fn provision_component(&self, component: &ComponentDeclaration) -> Result<()> {
+    /// Provision a single component, returning the number of tools it exports.
+    async fn provision_component(&self, component: &ComponentDeclaration) -> Result<usize> {
         // Step 1: Seed secrets from environment variables
         self.seed_secrets(component)
             .context("Failed to seed secrets")?;
@@ -170,7 +211,7 @@ impl<'a> ProvisioningController<'a> {
                 .context("Digest verification failed")?;
         }
 
-        Ok(())
+        Ok(load_outcome.tool_names.len())
     }
 
     /// Seed secrets from environment variables
@@ -388,7 +429,7 @@ mod tests {
     #[test]
     fn report_without_failures_has_no_summary() {
         let report = ProvisioningReport {
-            provisioned: vec!["fetch".to_string(), "time".to_string()],
+            provisioned: vec![("fetch".to_string(), 1), ("time".to_string(), 3)],
             failures: Vec::new(),
         };
 
@@ -396,6 +437,33 @@ mod tests {
         assert!(!report.has_failures());
         assert!(report.failed_names().is_empty());
         assert!(report.failure_summary().is_none());
+        assert_eq!(report.tool_count(), 4);
+        assert_eq!(
+            report.provisioned_summary().unwrap(),
+            "fetch (1 tool), time (3 tools)"
+        );
+    }
+
+    #[test]
+    fn report_names_the_zero_tool_component_in_the_provisioned_summary() {
+        let report = ProvisioningReport {
+            provisioned: vec![("arxiv-rs".to_string(), 0), ("fetch".to_string(), 1)],
+            failures: Vec::new(),
+        };
+
+        assert_eq!(report.tool_count(), 1);
+        assert_eq!(
+            report.provisioned_summary().unwrap(),
+            "arxiv-rs (0 tools), fetch (1 tool)"
+        );
+    }
+
+    #[test]
+    fn empty_report_has_no_provisioned_summary() {
+        let report = ProvisioningReport::default();
+
+        assert_eq!(report.tool_count(), 0);
+        assert!(report.provisioned_summary().is_none());
     }
 
     #[test]
@@ -420,7 +488,7 @@ mod tests {
     #[test]
     fn report_with_mixed_outcomes_summarizes_only_failures() {
         let report = ProvisioningReport {
-            provisioned: vec!["fetch".to_string()],
+            provisioned: vec![("fetch".to_string(), 1)],
             failures: vec![("time".to_string(), anyhow::anyhow!("registry timeout"))],
         };
 

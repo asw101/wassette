@@ -232,13 +232,20 @@ async fn main() -> Result<()> {
                     let report = provisioner.provision().await;
 
                     match report.failure_summary() {
-                        None => tracing::info!("All components provisioned successfully"),
+                        None => tracing::info!(
+                            "All components provisioned successfully with {} tool(s) total: {}",
+                            report.tool_count(),
+                            report
+                                .provisioned_summary()
+                                .unwrap_or_else(|| "no components declared".to_string())
+                        ),
                         Some(summary) if cfg.continue_on_provisioning_failure => {
                             tracing::error!("{}", summary);
                             tracing::warn!(
-                                "Starting server in degraded mode: {} of {} component(s) provisioned. Unavailable component(s): {}",
+                                "Starting server in degraded mode: {} of {} component(s) provisioned with {} tool(s) total. Unavailable component(s): {}",
                                 report.provisioned.len(),
                                 report.total(),
+                                report.tool_count(),
                                 report.failed_names().join(", ")
                             );
                         }
