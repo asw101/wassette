@@ -20,7 +20,7 @@ on:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -50,18 +50,18 @@ jobs:
         run: |
           mkdir bin
           curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.52/mdbook-v0.4.52-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=bin
-          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
       
       - name: Install mdBook Tabs
         run: |
           # Pinned to the last 0.4-compatible release; mdbook-tabs 0.3+ requires mdBook 0.5.
           cargo install mdbook-tabs --version 0.2.3
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install mdbook-mermaid
         run: |
           curl -sSL https://github.com/badboy/mdbook-mermaid/releases/download/v0.14.0/mdbook-mermaid-v0.14.0-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=bin
-          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: Setup Pages
         id: pages
@@ -74,10 +74,14 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             VERSION="$INPUT_TAG"
+            if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "tag_name must be a stable release tag such as v0.7.1" >&2
+              exit 1
+            fi
           else
             VERSION="latest"
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building documentation for version: $VERSION"
 
       - name: Build with mdBook
@@ -85,44 +89,43 @@ jobs:
           cd docs
           mdbook build
 
-      - name: Download existing GitHub Pages content
+      - name: Find published documentation
+        id: published
         run: |
-          # IMPORTANT: GitHub Pages deployments completely replace the entire site with
-          # the uploaded artifact. Without this preservation step, deploying a new version
-          # (e.g., v0.4.0) would delete all previously published versions (e.g., v0.3.0, latest).
-          # We fetch content from the gh-pages branch and merge it with the new version
-          # to maintain a complete multi-version documentation site.
-          echo "Attempting to download existing site content..."
-          mkdir -p public
-          
-          # Save current commit for returning later
-          CURRENT_COMMIT=$(git rev-parse HEAD)
-          
-          # Try to download existing site as a tarball from gh-pages branch
-          if git ls-remote --heads origin gh-pages >/dev/null 2>&1; then
-            echo "gh-pages branch exists, fetching existing content..."
-            git fetch origin gh-pages:gh-pages || true
-            git checkout gh-pages -- . 2>/dev/null || echo "No existing gh-pages content"
-            # Move existing content to public if it exists
-            if [ -d "wassette" ]; then
-              cp -r wassette public/ || true
-            fi
-            # Return to original commit
-            git checkout $CURRENT_COMMIT || echo "Could not return to original commit"
+          if git ls-remote --exit-code --heads origin refs/heads/gh-pages; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "ref=gh-pages" >> "$GITHUB_OUTPUT"
           else
-            echo "gh-pages branch does not exist yet, starting fresh"
+            status=$?
+            if [[ "$status" -ne 2 ]]; then
+              echo "Could not determine whether gh-pages exists" >&2
+              exit "$status"
+            fi
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Prepare versioned output
+      - name: Checkout published documentation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.published.outputs.ref }}
+          path: published
+
+      - name: Initialize published documentation
+        if: steps.published.outputs.exists == 'false'
         run: |
-          # Create directory structure for this version
-          mkdir -p public/wassette/${{ steps.version.outputs.version }}
+          git -C published checkout --orphan gh-pages
+          git -C published rm -rf .
 
-          # Copy newly built docs to the version directory
-          cp -r docs/book/* public/wassette/${{ steps.version.outputs.version }}/
+      - name: Prepare versioned output
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          rm -rf "published/$VERSION"
+          mkdir -p "published/$VERSION"
+          cp -r docs/book/. "published/$VERSION/"
 
-          # Create root redirect page (this should NOT be in docs source, only at GitHub Pages root)
-          cat > public/wassette/index.html << 'EOF'
+          cat > published/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -164,60 +167,61 @@ jobs:
           </body>
           </html>
           EOF
-          
-          # Load or create versions.json
-          if [ -f "public/wassette/versions.json" ]; then
-            echo "Using existing versions.json"
-            cp public/wassette/versions.json versions.json.tmp
-          else
-            echo "Creating new versions.json"
-            cp docs/versions.json versions.json.tmp
-          fi
-          
-          # Update versions.json with current version
+
           python3 << 'EOF'
           import json
-          
-          version = "${{ steps.version.outputs.version }}"
-          
-          try:
-              with open("versions.json.tmp", "r") as f:
-                  data = json.load(f)
-          except:
-              data = {"versions": ["latest"], "latest": "latest"}
-          
-          # Add current version if it's not already in the list
-          if version not in data["versions"]:
-              # Insert version after "latest" if it's a tag
-              if version.startswith("v"):
-                  if "latest" in data["versions"]:
-                      idx = data["versions"].index("latest") + 1
-                      data["versions"].insert(idx, version)
-                  else:
-                      data["versions"].insert(0, version)
-              else:
-                  # Ensure "latest" is first
-                  if "latest" not in data["versions"]:
-                      data["versions"].insert(0, "latest")
-          
-          with open("public/wassette/versions.json", "w") as f:
-              json.dump(data, f, indent=2)
-          
-          print(f"Updated versions.json with version: {version}")
-          print(f"All versions: {data['versions']}")
+          import re
+          from pathlib import Path
+
+          root = Path("published")
+          release = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+
+          versions = []
+          if (root / "latest" / "index.html").is_file():
+              versions.append("latest")
+
+          releases = []
+          for path in root.iterdir():
+              match = release.fullmatch(path.name)
+              if match and (path / "index.html").is_file():
+                  releases.append((tuple(map(int, match.groups())), path.name))
+          versions.extend(name for _, name in sorted(releases, reverse=True))
+
+          if not versions:
+              raise SystemExit("No publishable documentation versions were built")
+
+          with (root / "versions.json").open("w") as versions_file:
+              json.dump({"versions": versions, "latest": "latest"}, versions_file, indent=2)
+              versions_file.write("\n")
+
+          print(f"Published versions: {versions}")
           EOF
-          
+
           echo "Current versions.json:"
-          cat public/wassette/versions.json
-          
-          echo ""
-          echo "Directory structure:"
-          ls -la public/wassette/
+          cat published/versions.json
+
+      - name: Save published documentation
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          github.event_name == 'workflow_dispatch'
+        working-directory: published
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          if git diff --cached --quiet; then
+            echo "Published documentation is already current"
+            exit 0
+          fi
+          git commit -m "docs: publish $VERSION"
+          git push origin HEAD:gh-pages
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: public/wassette
+          path: published
 
   # Deployment job
   deploy:
