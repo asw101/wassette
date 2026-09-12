@@ -48,7 +48,7 @@ The problem compounds when multiple tools with overlapping permissions are loade
 
 Wassette enforces least privilege through deny-by-default permissions at the component level. Components start with zero access to system resources. Each capability must be explicitly granted through a policy file that specifies exactly which resources the component can access.
 
-Storage permissions use URI-based paths with explicit access modes (read, write, or both). A component can be granted read access to `fs:///workspace/data` and write access to `fs:///workspace/output` without receiving access to other directories. Network permissions specify individual hosts rather than wildcards. Environment permissions list specific variable names rather than allowing access to the entire environment.
+Storage permissions use URI-based paths with read-only or read-write access modes. A component can be granted read-only access to `fs:///workspace/data` and read-write access to `fs:///workspace/output` without receiving access to other directories. Network permissions specify individual hosts rather than wildcards. Environment permissions list specific variable names rather than allowing access to the entire environment.
 
 The policy system supports both file-based and runtime permission management. Developers can define initial policies co-located with component binaries, and administrators can modify permissions dynamically using built-in tools like `grant-storage-permission` and `grant-network-permission`. This granularity enables precise control over component capabilities.
 
@@ -125,7 +125,7 @@ The challenge is compounded by the fact that AI agents often need access to subs
 
 **Wassette Mitigation:**
 
-Wassette addresses data exfiltration through multiple complementary mechanisms. First, the deny-by-default permission model ensures components can only access specific data they need. File system permissions are path-specific and can distinguish between read and write access, preventing components from accessing sensitive directories or files outside their scope.
+Wassette addresses data exfiltration through multiple complementary mechanisms. First, the deny-by-default permission model ensures components can only access specific data they need. File system permissions are path-specific and can distinguish read-only from read-write access, preventing components from accessing sensitive directories or files outside their scope.
 
 Second, network permissions operate at the domain level, preventing components from connecting to unauthorized destinations. Even if a component gains access to sensitive data through legitimate means, it cannot exfiltrate that data without network permissions to the attacker's infrastructure. Organizations can restrict network access to only necessary API endpoints and monitoring services.
 

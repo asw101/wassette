@@ -2,16 +2,17 @@
 // Licensed under the MIT license.
 
 use std::collections::HashSet;
+use std::future::Future;
 
 use anyhow::Result;
+use http_body_util::BodyExt;
 use tracing::{debug, warn};
 use url::Url;
 use wasmtime_wasi::{WasiCtxView, WasiView};
 use wasmtime_wasi_http::p2::bindings::http::types;
-use wasmtime_wasi_http::p2::body::HyperOutgoingBody;
-use wasmtime_wasi_http::p2::types::{HostFutureIncomingResponse, OutgoingRequestConfig};
-use wasmtime_wasi_http::p2::{
-    default_send_request, HttpResult, WasiHttpCtxView, WasiHttpHooks, WasiHttpView,
+use wasmtime_wasi_http::{
+    default_send_request, RequestOptions, Result as HttpResult, WasiBody, WasiHttpCtxView,
+    WasiHttpHooks, WasiHttpView,
 };
 
 use crate::wasistate::PermissionError;
@@ -189,12 +190,29 @@ impl WasiHttpView for WassetteWasiState<crate::wasistate::WasiState> {
 impl WasiHttpHooks for NetworkPolicyHttpHooks {
     fn send_request(
         &mut self,
-        request: hyper::Request<HyperOutgoingBody>,
-        config: OutgoingRequestConfig,
-    ) -> HttpResult<HostFutureIncomingResponse> {
-        self.validate_request_uri(request.uri())?;
+        request: hyper::Request<WasiBody>,
+        options: Option<RequestOptions>,
+        fut: Box<dyn Future<Output = HttpResult<()>> + Send>,
+    ) -> Box<
+        dyn Future<
+                Output = HttpResult<(
+                    hyper::Response<WasiBody>,
+                    Box<dyn Future<Output = HttpResult<()>> + Send>,
+                )>,
+            > + Send,
+    > {
+        if let Err(error) = self.validate_request_uri(request.uri()) {
+            return Box::new(async move { Err(error) });
+        }
 
-        Ok(default_send_request(request, config))
+        Box::new(async move {
+            _ = fut;
+            let (response, io) = default_send_request(request, options).await?;
+            Ok((
+                response.map(BodyExt::boxed_unsync),
+                Box::new(io) as Box<dyn Future<Output = HttpResult<()>> + Send>,
+            ))
+        })
     }
 }
 

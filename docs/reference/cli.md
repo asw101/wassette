@@ -532,6 +532,9 @@ wassette permission grant memory my-component 2048Ki
 - `--access <ACCESS>`: For storage permissions, comma-separated list of access types (read, write)
 - `--component-dir <PATH>`: Component storage directory
 
+Wasmtime exposes preopened directories as either read-only or read-write.
+Consequently, any access list containing `write` grants read-write access.
+
 ### `wassette permission revoke`
 
 Remove specific permissions from a component.

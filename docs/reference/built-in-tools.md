@@ -123,6 +123,9 @@ When an existing component is replaced, the `status` value becomes
   - `uri` (string, required): URI of the storage resource (e.g., `fs:///tmp/test`)
   - `access` (array, required): Array of access types, must be `["read"]`, `["write"]`, or `["read", "write"]`
 
+Wasmtime exposes preopened directories as either read-only or read-write.
+Consequently, any access array containing `"write"` grants read-write access.
+
 **Returns:**
 ```json
 {
